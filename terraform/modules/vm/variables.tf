@@ -11,6 +11,6 @@ variable "vpc_id" {
   type = string
 }
 
-variable "count" {
+variable "count_slave" {
   type = number
 }
