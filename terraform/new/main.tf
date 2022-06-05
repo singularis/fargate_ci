@@ -104,21 +104,23 @@ resource "aws_security_group" "iva-sg-master-slave" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block]
+    cidr_blocks = ["0.0.0.0/0",
+    "172.31.0.0/16"
+    ]
   }
 
   egress {
@@ -136,6 +138,7 @@ resource "aws_instance" "Master"{
   instance_type          = "t3.micro"
   key_name               = "dante-new"
   subnet_id              = aws_subnet.public.id
+  associate_public_ip_address = true
   private_ip             = "10.0.11.10"
   vpc_security_group_ids = [aws_security_group.iva-sg-master-slave.id]
     tags = {
@@ -148,9 +151,41 @@ resource "aws_instance" "Slave" {
   instance_type          = "t3.micro"
   key_name               = "dante-new"
   subnet_id              = aws_subnet.private.id
+  associate_public_ip_address = true
   private_ip             = "10.0.21.10"
   vpc_security_group_ids = [aws_security_group.iva-sg-master-slave.id]
     tags = {
     Name = "Slave"
   }
+}
+
+resource "aws_vpc_peering_connection" "todef" {
+  peer_vpc_id   = "vpc-063df4e9508599d88"
+  vpc_id        = aws_vpc.main.id
+  auto_accept   = true
+  tags = {
+    Name = "todef"
+  }
+}
+
+resource "aws_route" "primary2secondary" {
+  # ID of VPC 1 main route table.
+  route_table_id = "rtb-03c4fab2363018ae5"
+
+  # CIDR block / IP range for VPC 2.
+  destination_cidr_block = "${aws_vpc.main.cidr_block}"
+
+  # ID of VPC peering connection.
+  vpc_peering_connection_id = "${aws_vpc_peering_connection.todef.id}"
+}
+
+resource "aws_route" "secondary2primary" {
+  # ID of VPC 2 main route table.
+  route_table_id = "${aws_vpc.main.main_route_table_id}"
+
+  # CIDR block / IP range for VPC 2.
+  destination_cidr_block = "172.31.0.0/16"
+
+  # ID of VPC peering connection.
+  vpc_peering_connection_id = "${aws_vpc_peering_connection.todef.id}"
 }
