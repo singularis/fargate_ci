@@ -63,7 +63,10 @@ resource "aws_route_table" "public" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.igw.id
   }
-
+    route {
+    cidr_block = "172.31.0.0/16"
+    gateway_id = aws_vpc_peering_connection.todef.id
+  }
   tags = {
     Name = "Public Route Table"
   }
@@ -82,6 +85,10 @@ resource "aws_route_table" "private" {
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_nat_gateway.nat.id
+  }
+  route {
+    cidr_block = "172.31.0.0/16"
+    gateway_id = aws_vpc_peering_connection.todef.id
   }
 
   tags = {
@@ -122,7 +129,13 @@ resource "aws_security_group" "iva-sg-master-slave" {
     "172.31.0.0/16"
     ]
   }
-
+  ingress {
+  cidr_blocks = ["0.0.0.0/0"]
+  from_port   = 8
+  to_port     = 0
+  protocol    = "icmp"
+  description = "Allow all ping4"
+}
   egress {
     from_port   = 0
     to_port     = 0
@@ -151,7 +164,6 @@ resource "aws_instance" "Slave" {
   instance_type          = "t3.micro"
   key_name               = "dante-new"
   subnet_id              = aws_subnet.private.id
-  associate_public_ip_address = true
   private_ip             = "10.0.21.10"
   vpc_security_group_ids = [aws_security_group.iva-sg-master-slave.id]
     tags = {
@@ -160,11 +172,20 @@ resource "aws_instance" "Slave" {
 }
 
 resource "aws_vpc_peering_connection" "todef" {
-  peer_vpc_id   = "vpc-063df4e9508599d88"
-  vpc_id        = aws_vpc.main.id
+  peer_vpc_id   = aws_vpc.main.id
+  vpc_id        = "vpc-063df4e9508599d88"
   auto_accept   = true
   tags = {
     Name = "todef"
+  }
+}
+
+resource "aws_vpc_peering_connection_accepter" "peer" {
+  vpc_peering_connection_id = aws_vpc_peering_connection.todef.id
+  auto_accept               = true
+
+  tags = {
+    Side = "Accepter"
   }
 }
 
